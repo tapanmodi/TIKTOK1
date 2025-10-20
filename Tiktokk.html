@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tiktokk.html</title>
+</head>
+<body>
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+  <title>Game First → 15s Video Overlay (Sky Theme)</title>
+  <style>
+    :root{
+      --bg: linear-gradient(135deg,#a1c4fd,#c2e9fb); /* Sky gradient */
+      --card:#ffffffdd;
+      --text:#0f172a;
+      --muted:#475569;
+      --accent:#3b82f6;
+      --win:#22c55e;
+    }
+    *{box-sizing:border-box}
+    html,body{margin:0;height:100%;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial}
+    .wrap{min-height:100%;display:flex;flex-direction:column}
+
+    .topbar{position:sticky;top:0;z-index:10;background:rgba(255,255,255,.8);backdrop-filter:blur(8px);border-bottom:1px solid rgba(0,0,0,.1);padding:10px 12px;display:flex;gap:10px;align-items:center;justify-content:space-between;border-radius:0 0 14px 14px}
+    h1{font-size:16px;margin:0}
+    .small{font-size:12px;color:var(--muted)}
+    .chip{font-variant-numeric:tabular-nums;padding:6px 10px;border-radius:10px;border:1px solid rgba(59,130,246,.35);color:var(--accent);background:#eff6ff}
+
+    .card{width:100%;max-width:520px;margin:14px auto 24px;background:var(--card);border:1px solid rgba(0,0,0,.08);border-radius:18px;padding:12px;box-shadow:0 8px 24px rgba(0,0,0,.15)}
+    .hud{display:flex;gap:10px;flex-wrap:wrap;align-items:center;color:var(--muted);font-size:14px;margin:6px 0 10px}
+    .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+    .cell{aspect-ratio:1;display:grid;place-items:center;background:#f0f9ff;border:1px solid #bae6fd;border-radius:16px;font-size:42px;font-weight:900;user-select:none;color:#0f172a}
+    .cell:active{transform:scale(.99)}
+    .cell.win{background:#bbf7d0;border-color:#22c55e}
+    .note{max-width:520px;margin:6px auto 16px;color:var(--muted);font-size:12px;padding:0 12px}
+
+    .overlay{position:fixed;inset:0;z-index:50;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,.5);backdrop-filter:blur(4px)}
+    .overlay.show{display:flex}
+    .panel{width:min(92vw,520px);border-radius:18px;overflow:hidden;background:#fff;border:1px solid rgba(0,0,0,.08);box-shadow:0 18px 60px rgba(0,0,0,.55)}
+    .panel-head{display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border-bottom:1px solid rgba(0,0,0,.08);background:#eff6ff}
+    .panel-head .title{font-weight:800;color:#0f172a}
+    .panel-head .right{display:flex;gap:8px;align-items:center}
+    .panel-body{position:relative;background:#000}
+    .video-aspect{position:relative;width:100%;padding-top:177.78%}
+    .video-aspect #player{position:absolute;inset:0;width:100%;height:100%}
+
+    .btn{appearance:none;border:0;border-radius:10px;padding:8px 12px;background:var(--accent);color:#fff;font-weight:800}
+    .btn.alt{background:transparent;color:var(--text);border:1px solid rgba(0,0,0,.18)}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="topbar">
+      <div>
+        <h1>Tic‑Tac‑Toe (Pehle Game, fir 15s Video)</h1>
+        <div class="small">Game turant shuru hota hai. Har chakkar me overlay 15s chalega, phir game wapas.</div>
+      </div>
+      <div class="chip">Next video in: <span id="count">15</span>s</div>
+    </div>
+
+    <div class="card">
+      <div class="hud">
+        <div>Turn: <strong id="turn">X</strong></div>
+        <div>Winner: <strong id="winner">—</strong></div>
+        <button id="reset" class="btn alt">Reset</button>
+      </div>
+      <div id="board" class="grid"></div>
+      <div class="note">Game aur video ke beech background ab ek <strong>aasman‑jaise gradient</strong> me hai, zyada attractive aur halka feel ke liye.</div>
+    </div>
+  </div>
+
+  <div id="overlay" class="overlay" aria-hidden="true">
+    <div class="panel" role="dialog" aria-modal="true">
+      <div class="panel-head">
+        <div class="title">Shorts</div>
+        <div class="right">
+          <button id="skip" class="btn alt">Skip</button>
+        </div>
+      </div>
+      <div class="panel-body">
+        <div class="video-aspect">
+          <div id="player"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="permWrap" style="position:fixed;bottom:12px;left:50%;transform:translateX(-50%);display:none;z-index:60;">
+    <button id="permBtn" class="btn">Enable Video</button>
+  </div>
+
+  <script>
+    const SHORTS_ID = '891k_mD-c4c';
+    const GAME_INTERVAL = 15;
+    const VIDEO_PHASE = 15;
+
+    let ytTag = document.createElement('script');
+    ytTag.src = 'https://www.youtube.com/iframe_api';
+    document.head.appendChild(ytTag);
+
+    let player = null;
+    function onYouTubeIframeAPIReady(){
+      player = new YT.Player('player', {
+        width: '100%', height: '100%', videoId: SHORTS_ID,
+        playerVars: { autoplay: 0, controls: 1, mute: 1, playsinline: 1, rel: 0, modestbranding: 1 },
+      });
+    }
+    window.onYouTubeIframeAPIReady = onYouTubeIframeAPIReady;
+
+    const overlay = document.getElementById('overlay');
+    const skipBtn = document.getElementById('skip');
+    const permWrap = document.getElementById('permWrap');
+    const permBtn  = document.getElementById('permBtn');
+
+    async function playMuted(){
+      try{ if(player){ player.mute(); player.seekTo(0,true); player.playVideo(); player.pauseVideo(); } permWrap.style.display='none'; }
+      catch(e){ permWrap.style.display='block'; }
+    }
+
+    function showOverlay(){ overlay.classList.add('show'); if(player){ try{ player.mute(); player.seekTo(0,true); player.playVideo(); }catch(e){} } }
+    function hideOverlay(){ overlay.classList.remove('show'); if(player){ try{ player.pauseVideo(); }catch(e){} } }
+    skipBtn.addEventListener('click', hideOverlay);
+    permBtn.addEventListener('click', playMuted);
+
+    const countEl = document.getElementById('count');
+    let phase = 'GAME';
+    let left = GAME_INTERVAL;
+    function updateCountdown(){ countEl.textContent = String(left); }
+    function tick(){
+      left--; updateCountdown();
+      if(left <= 0){
+        if(phase==='GAME'){ phase='VIDEO'; left=VIDEO_PHASE; updateCountdown(); showOverlay(); }
+        else { phase='GAME'; left=GAME_INTERVAL; updateCountdown(); hideOverlay(); }
+      }
+    }
+    (function init(){ updateCountdown(); playMuted(); setInterval(tick,1000); })();
+
+    const boardEl = document.getElementById('board');
+    const turnEl = document.getElementById('turn');
+    const winnerEl = document.getElementById('winner');
+    const resetBtn = document.getElementById('reset');
+
+    let board = Array(9).fill(null);
+    let turn = 'X';
+    const wins = [[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
+    function render(){ boardEl.innerHTML=''; board.forEach((val,i)=>{ const c=document.createElement('button'); c.className='cell'; c.textContent=val?val:''; c.addEventListener('click',()=>move(i)); boardEl.appendChild(c); }); }
+    function winnerIdxs(){ for(const w of wins){ const[a,b,c]=w; if(board[a]&&board[a]===board[b]&&board[a]===board[c]) return w; } return null; }
+    function move(i){ if(board[i]||winnerIdxs()) return; board[i]=turn; turn=(turn==='X')?'O':'X'; updateHUD(); render(); const w=winnerIdxs(); if(w){ winnerEl.textContent=board[w[0]]; [...boardEl.children].forEach((cell,idx)=>{ if(w.includes(idx)) cell.classList.add('win'); }); } }
+    function updateHUD(){ turnEl.textContent=turn; if(!winnerIdxs()) winnerEl.textContent='—'; }
+    function reset(){ board=Array(9).fill(null); turn='X'; winnerEl.textContent='—'; render(); updateHUD(); }
+    resetBtn.addEventListener('click', reset);
+
+    render(); updateHUD();
+  </script>
+</body>
+</html>
+
+</body>
+</html>
